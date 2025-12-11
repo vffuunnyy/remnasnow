@@ -62,13 +62,13 @@ pub const FRAGMENT_SHADER_SOURCE: &str = r#"
         coord = vec2(coord.x * c - coord.y * s, coord.x * s + coord.y * c);
 
         float dist_sq = dot(coord, coord);
-        float dist = sqrt(dist_sq);
 
-        // Soft edge using smoothstep on squared distance (avoids one sqrt)
-        // thresholds correspond roughly to radius 0.25 and 0.5 (squared: 0.0625, 0.25)
+        // thresholds: radius 0.25 and 0.5 squared = 0.0625, 0.25
         float alpha = 1.0 - smoothstep(0.0625, 0.25, dist_sq);
 
-        float glow = exp(-dist * 5.0) * 0.4;
+        // Glow using squared distance approximation
+        // exp(-sqrt(x) * 5) ≈ exp(-x * 2.5) for small x
+        float glow = exp(-dist_sq * 10.0) * 0.4;
 
         gl_FragColor = vec4(vec3(1.0 + glow), alpha * v_color.a);
     }

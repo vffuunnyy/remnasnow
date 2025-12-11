@@ -7,15 +7,16 @@ PKG_DIR = $(DIST_DIR)/pkg
 WASM_FILE = $(PKG_DIR)/remnasnow_bg.wasm
 WASM_TARGET = wasm32-unknown-unknown
 
+RUSTFLAGS = -C target-feature=+simd128
 WASM_OPT_LEVEL = -Oz
-WASM_OPT_FLAGS = --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals
+WASM_OPT_FLAGS = --enable-simd --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals
 
 all: release-opt
 
 dev:
 	@echo "🔧 Building DEBUG version (configurable parameters)..."
 	@rm -rf $(PKG_DIR)
-	cargo build --lib --target $(WASM_TARGET) --features configurable
+	RUSTFLAGS="$(RUSTFLAGS)" cargo build --lib --target $(WASM_TARGET) --features configurable
 	wasm-bindgen target/$(WASM_TARGET)/debug/remnasnow.wasm --out-dir $(PKG_DIR) --target web
 	@echo "✅ Debug build complete!"
 	@echo "   Set methods available: set_particle_count, set_gravity, set_depth, etc."
@@ -23,7 +24,7 @@ dev:
 release:
 	@echo "🚀 Building RELEASE version (hardcoded parameters)..."
 	@rm -rf $(PKG_DIR)
-	cargo build --lib --target $(WASM_TARGET) --release
+	RUSTFLAGS="$(RUSTFLAGS)" cargo build --lib --target $(WASM_TARGET) --release
 	wasm-bindgen target/$(WASM_TARGET)/release/remnasnow.wasm --out-dir $(PKG_DIR) --target web
 	@echo "✅ Release build complete!"
 	@echo "   Parameters are hardcoded for maximum performance."

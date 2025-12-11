@@ -40,6 +40,9 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
+[profile.release.package."*"]
+opt-level = 3
+
 [profile.dev]
 opt-level = 1
 

@@ -19,7 +19,7 @@ pub const VERTEX_SHADER_SOURCE: &str = r#"
 
     // Use lower-precision varyings where suitable to save bandwidth on mobile GPUs
     varying lowp vec4 v_color;
-    varying mediump float v_rotation;
+    varying mediump vec2 v_rotSinCos;  // Pre-computed sin/cos for rotation
 
     void main() {
         mediump float t = u_time;
@@ -44,7 +44,9 @@ pub const VERTEX_SHADER_SOURCE: &str = r#"
         gl_PointSize = a_size * u_pointScale / projected.w;
 
         v_color = a_color;
-        v_rotation = a_rotation.x + rot_factor;
+        
+        mediump float final_rotation = a_rotation.x + rot_factor;
+        v_rotSinCos = vec2(sin(final_rotation), cos(final_rotation));
     }
 "#;
 
@@ -52,17 +54,16 @@ pub const FRAGMENT_SHADER_SOURCE: &str = r#"
     precision mediump float;
 
     varying lowp vec4 v_color;
-    varying mediump float v_rotation;
+    varying mediump vec2 v_rotSinCos;
 
     void main() {
         vec2 coord = gl_PointCoord - 0.5;
 
-        float s = sin(v_rotation);
-        float c = cos(v_rotation);
-        coord = vec2(coord.x * c - coord.y * s, coord.x * s + coord.y * c);
+        coord = vec2(coord.x * v_rotSinCos.y - coord.y * v_rotSinCos.x,
+                    coord.x * v_rotSinCos.x + coord.y * v_rotSinCos.y);
 
         float dist_sq = dot(coord, coord);
-
+        
         // thresholds: radius 0.25 and 0.5 squared = 0.0625, 0.25
         float alpha = 1.0 - smoothstep(0.0625, 0.25, dist_sq);
 

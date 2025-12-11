@@ -1,6 +1,6 @@
 # RemnaSnow Makefile
 
-.PHONY: all dev release release-opt clean serve serve-release help check fmt clippy test wasm-opt size
+.PHONY: all configurable configurable-opt release release-opt clean serve serve-release help check fmt clippy test wasm-opt size
 
 DIST_DIR = dist
 PKG_DIR = $(DIST_DIR)/pkg
@@ -11,15 +11,18 @@ RUSTFLAGS = -C target-feature=+simd128
 WASM_OPT_LEVEL = -Oz
 WASM_OPT_FLAGS = --enable-simd --enable-bulk-memory --enable-nontrapping-float-to-int --enable-sign-ext --enable-mutable-globals
 
-all: release-opt
+all: configurable-opt release-opt
 
-dev:
-	@echo "🔧 Building DEBUG version (configurable parameters)..."
+configurable:
+	@echo "🔧 Building CONFIGURABLE version (release with configurable parameters)..."
 	@rm -rf $(PKG_DIR)
-	RUSTFLAGS="$(RUSTFLAGS)" cargo build --lib --target $(WASM_TARGET) --features configurable
-	wasm-bindgen target/$(WASM_TARGET)/debug/remnasnow.wasm --out-dir $(PKG_DIR) --target web
-	@echo "✅ Debug build complete!"
+	RUSTFLAGS="$(RUSTFLAGS)" cargo build --lib --target $(WASM_TARGET) --release --features configurable
+	wasm-bindgen target/$(WASM_TARGET)/release/remnasnow.wasm --out-dir $(PKG_DIR) --target web
+	@echo "✅ Configurable build complete!"
 	@echo "   Set methods available: set_particle_count, set_gravity, set_depth, etc."
+
+configurable-opt: configurable wasm-opt
+	@echo "✅ Optimized configurable build complete!"
 
 release:
 	@echo "🚀 Building RELEASE version (hardcoded parameters)..."
@@ -110,28 +113,29 @@ help:
 	@echo "RemnaSnow Build System"
 	@echo ""
 	@echo "Build modes:"
-	@echo "  make dev              - Debug build with configurable parameters"
-	@echo "  make release          - Release build with hardcoded parameters"
-	@echo "  make release-opt      - Release build + wasm-opt (default)"
-	@echo "  make release-profiling - Release build with profiling info"
+	@echo "  make configurable         - Release build with configurable parameters"
+	@echo "  make configurable-opt     - Release build with configurable parameters + wasm-opt"
+	@echo "  make release              - Release build with hardcoded parameters"
+	@echo "  make release-opt          - Release build + wasm-opt (default)"
+	@echo "  make release-profiling    - Release build with profiling info"
 	@echo ""
 	@echo "Optimization:"
-	@echo "  make wasm-opt         - Run wasm-opt on existing WASM file"
-	@echo "                          (requires binaryen: cargo install wasm-opt)"
+	@echo "  make wasm-opt             - Run wasm-opt on existing WASM file"
+	@echo "                              (requires binaryen: cargo install wasm-opt)"
 	@echo ""
 	@echo "Checks:"
-	@echo "  make check            - Check compilation for both modes"
-	@echo "  make fmt              - Format code"
-	@echo "  make clippy           - Run linter"
+	@echo "  make check                - Check compilation for both modes"
+	@echo "  make fmt                  - Format code"
+	@echo "  make clippy               - Run linter"
 	@echo ""
 	@echo "Utilities:"
-	@echo "  make clean            - Remove build artifacts"
-	@echo "  make serve            - Build dev and start HTTP server"
-	@echo "  make serve-release    - Build optimized release and start HTTP server"
-	@echo "  make size             - Show WASM file size (raw and gzipped)"
+	@echo "  make clean                - Remove build artifacts"
+	@echo "  make serve                - Build dev and start HTTP server"
+	@echo "  make serve-release        - Build optimized release and start HTTP server"
+	@echo "  make size                 - Show WASM file size (raw and gzipped)"
 	@echo ""
 	@echo "Usage:"
-	@echo "  Debug mode allows runtime configuration via JS API:"
+	@echo "  Configurable mode allows runtime configuration via JS API:"
 	@echo "    snowfall.set_gravity(8.0)"
 	@echo "    snowfall.set_particle_count(200000)"
 	@echo "    etc."

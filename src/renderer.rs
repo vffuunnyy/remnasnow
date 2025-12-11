@@ -297,8 +297,8 @@ impl SnowfallShader {
         let dpi = window.device_pixel_ratio();
 
         let (width, height) = (
-            (window.inner_width()?.as_f64().unwrap_or(800.0) * dpi) as u32,
-            (window.inner_height()?.as_f64().unwrap_or(600.0) * dpi) as u32,
+            (self.canvas.client_width() as f64 * dpi) as u32,
+            (self.canvas.client_height() as f64 * dpi) as u32,
         );
 
         self.canvas.set_width(width);

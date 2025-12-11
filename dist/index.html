@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RemnaSnow</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;700;900&display=swap" rel="stylesheet" />
+    <script src="https://mrdoob.github.io/stats.js/build/stats.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body,
+        html {
+            width: 100%;
+            min-height: 100%;
+            overflow-x: hidden;
+            overflow-y: auto;
+            background:
+                linear-gradient(to right, rgba(128, 128, 128, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(128, 128, 128, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, #161b23, #21262d);
+            background-size: 50px 50px, 50px 50px, 100% 100%;
+            background-attachment: fixed;
+        }
+
+        #main-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            gap: 30px;
+            z-index: 1000;
+            padding: 40px 20px;
+        }
+
+        #snowfall-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        #snowfall-canvas.resizing {
+            opacity: 0;
+            transition: none;
+        }
+
+        #snowfall-canvas.fade-in {
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        #controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .panel {
+            border: 1px solid #484f58;
+            box-shadow: 0 1px 3px #0003;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            background: linear-gradient(135deg,
+                    color-mix(in srgb, #21262d 30%, transparent) 0%,
+                    color-mix(in srgb, #161b22 30%, transparent) 100%);
+            padding: 20px;
+            border-radius: 12px;
+            color: white;
+            font-size: 14px;
+            min-width: 160px;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .panel:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px #0006;
+        }
+
+        .panel-title {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .panel-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4ade80;
+        }
+
+        .panel-value.yellow {
+            color: #facc15;
+        }
+
+        .panel-value.red {
+            color: #f87171;
+        }
+
+        .panel-value.blue {
+            color: #60a5fa;
+        }
+
+        .panel-value.purple {
+            color: #c084fc;
+        }
+
+        .panel-value.cyan {
+            color: #22d3d3;
+        }
+
+        .panel-slider {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .panel-slider input[type="range"] {
+            width: 100%;
+            height: 6px;
+            appearance: none;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .panel-slider input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #4ade80;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .panel-slider input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #4ade80;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        #stats-container {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 1001;
+            display: flex;
+            gap: 5px;
+        }
+
+        #stats-container>div {
+            position: static !important;
+        }
+
+        .panel-direction {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .direction-btn {
+            padding: 5px 12px;
+            border: 1px solid #484f58;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .direction-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .direction-btn.active {
+            background: #4ade80;
+            color: #000;
+            border-color: #4ade80;
+        }
+
+        .direction-btn.active.reverse {
+            background: #f87171;
+            border-color: #f87171;
+        }
+
+        .config-buttons {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .config-btn {
+            flex: 1;
+            padding: 12px 24px;
+            border: 1px solid #484f58;
+            border-radius: 12px;
+            background: linear-gradient(135deg,
+                    color-mix(in srgb, #21262d 50%, transparent) 0%,
+                    color-mix(in srgb, #161b22 50%, transparent) 100%);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            z-index: 1001;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .config-btn:hover {
+            transform: scale(1.05);
+            background: linear-gradient(135deg,
+                    color-mix(in srgb, #21262d 70%, transparent) 0%,
+                    color-mix(in srgb, #161b22 70%, transparent) 100%);
+            box-shadow: 0 4px 12px #0006;
+        }
+
+        .config-btn.success {
+            background: #4ade80;
+            color: #000;
+            border-color: #4ade80;
+        }
+
+        .config-btn.error {
+            background: #f87171;
+            color: #000;
+            border-color: #f87171;
+        }
+
+        .config-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        #logo-title {
+            font-family: "Unbounded", sans-serif;
+            font-size: 48px;
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+
+        #logo-title .remna {
+            color: #3bc9db;
+        }
+
+        #logo-title .snow {
+            color: #ffffff;
+        }
+
+        .wasm-badge {
+            background: linear-gradient(135deg, #654ff0, #5c4ee5);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+            vertical-align: middle;
+            display: inline-block;
+            letter-spacing: normal;
+        }
+
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #161b23;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+
+        #loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #3bc9db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            color: white;
+            margin-top: 20px;
+            font-family: "Unbounded", sans-serif;
+            font-size: 16px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 768px) {
+            #main-container {
+                padding-top: 80px;
+            }
+
+            #logo-title {
+                font-size: 28px;
+            }
+
+            .wasm-badge {
+                font-size: 10px;
+                padding: 3px 8px;
+            }
+
+            .config-buttons {
+                flex-direction: column;
+            }
+
+            .config-btn {
+                width: 100%;
+            }
+
+            #stats-container {
+                top: 15px;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Загрузка WASM модуля...</div>
+    </div>
+
+    <div id="main-container">
+        <h1 id="logo-title">
+            <span class="remna">Remna</span><span class="snow">Snow</span>
+            <span class="wasm-badge">WASM</span>
+        </h1>
+        <div id="controls">
+            <div class="panel">
+                <div class="panel-title">FPS</div>
+                <div class="panel-value" id="fps-value">0</div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Частицы</div>
+                <div class="panel-value blue" id="particle-value">250K</div>
+                <div class="panel-slider">
+                    <input type="range" id="particle-slider" min="10000" max="500000" step="10000" value="250000" />
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Гравитация</div>
+                <div class="panel-value purple" id="gravity-value">8</div>
+                <div class="panel-slider">
+                    <input type="range" id="gravity-slider" min="1" max="30" step="1" value="8" />
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Размер</div>
+                <div class="panel-value cyan" id="size-value">2.5</div>
+                <div class="panel-slider">
+                    <input type="range" id="size-slider" min="0.5" max="10" step="0.5" value="2.5" />
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Ветер</div>
+                <div class="panel-value yellow" id="wind-value">0.00</div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Время</div>
+                <div class="panel-value blue" id="time-value">0.0</div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Глубина</div>
+                <div class="panel-value purple" id="depth-value">80</div>
+                <div class="panel-slider">
+                    <input type="range" id="depth-slider" min="20" max="150" step="10" value="80" />
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Альфа мин</div>
+                <div class="panel-value cyan" id="alpha-value">0.5</div>
+                <div class="panel-slider">
+                    <input type="range" id="alpha-slider" min="0.1" max="1" step="0.1" value="0.5" />
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Скорость Y</div>
+                <div class="panel-value yellow" id="speedy-value">0.3</div>
+                <div class="panel-slider">
+                    <input type="range" id="speedy-slider" min="0.1" max="2" step="0.1" value="0.3" />
+                </div>
+                <div class="panel-direction">
+                    <button class="direction-btn active" id="diry-down">↓</button>
+                    <button class="direction-btn" id="diry-up">↑</button>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-title">Вращение</div>
+                <div class="panel-value purple" id="rotation-value">1.0</div>
+                <div class="panel-slider">
+                    <input type="range" id="rotation-slider" min="0" max="5" step="0.1" value="1.0" />
+                </div>
+            </div>
+        </div>
+        <div class="config-buttons">
+            <button id="paste-btn" class="config-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                Вставить конфиг
+            </button>
+            <button id="copy-btn" class="config-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                Копировать конфиг
+            </button>
+        </div>
+    </div>
+    <div id="stats-container"></div>
+    <canvas id="snowfall-canvas"></canvas>
+
+    <script type="module">
+        const DEFAULT_CONFIG = {
+            particleCount: 250000,
+            gravity: 8.0,
+            depth: 80.0,
+            minSize: 2.5,
+            minAlpha: 0.5,
+            speedX: 0.2,
+            speedY: 0.3,
+            directionX: 1.0,
+            directionY: 1.0,
+            rotationSpeed: 1.0,
+        };
+
+        let currentConfig = { ...DEFAULT_CONFIG };
+        let snowfall = null;
+        let stats = null;
+
+        async function initWasm() {
+            try {
+                const wasm = await import("./pkg/remnasnow.js");
+                await wasm.default("./pkg/remnasnow_bg.wasm");
+                console.log("[RemnaSnow] WASM loaded");
+
+                snowfall = new wasm.SnowfallShader("snowfall-canvas", currentConfig.particleCount);
+                document.getElementById("loading-overlay").classList.add("hidden");
+
+                initUI();
+                startRenderLoop();
+            } catch (error) {
+                console.error("[RemnaSnow] WASM load error:", error);
+                document.querySelector(".loading-text").textContent = "Ошибка загрузки WASM";
+                document.querySelector(".loading-text").style.color = "#f87171";
+            }
+        }
+
+        function startRenderLoop() {
+            function loop(currentTime) {
+                if (stats) {
+                    stats.fps.begin();
+                    stats.ms.begin();
+                    stats.mb.begin();
+                }
+
+                const result = snowfall.render(currentTime);
+                updateDisplay(result);
+
+                if (stats) {
+                    stats.fps.end();
+                    stats.ms.end();
+                    stats.mb.end();
+                }
+
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+        }
+
+        function updateDisplay(result) {
+            const fpsValue = document.getElementById("fps-value");
+            fpsValue.textContent = result.fps;
+            fpsValue.className = "panel-value";
+            if (result.fps < 30) fpsValue.classList.add("red");
+            else if (result.fps < 55) fpsValue.classList.add("yellow");
+
+            document.getElementById("time-value").textContent = result.time.toFixed(1);
+            document.getElementById("wind-value").textContent = result.wind.toFixed(2);
+        }
+
+        function initUI() {
+            const statsContainer = document.getElementById("stats-container");
+            const statsFPS = new Stats(); statsFPS.showPanel(0); statsContainer.appendChild(statsFPS.dom);
+            const statsMS = new Stats(); statsMS.showPanel(1); statsContainer.appendChild(statsMS.dom);
+            const statsMB = new Stats(); statsMB.showPanel(2); statsContainer.appendChild(statsMB.dom);
+            stats = { fps: statsFPS, ms: statsMS, mb: statsMB };
+
+            const $ = id => document.getElementById(id);
+
+            $("particle-slider").addEventListener("input", e => {
+                const count = parseInt(e.target.value);
+                currentConfig.particleCount = count;
+                $("particle-value").textContent = count >= 1000 ? (count / 1000).toFixed(0) + "K" : count;
+                snowfall.set_particle_count(count);
+            });
+
+            $("gravity-slider").addEventListener("input", e => {
+                currentConfig.gravity = parseFloat(e.target.value);
+                $("gravity-value").textContent = currentConfig.gravity;
+                snowfall.set_gravity(currentConfig.gravity);
+            });
+
+            $("size-slider").addEventListener("input", e => {
+                currentConfig.minSize = parseFloat(e.target.value);
+                $("size-value").textContent = currentConfig.minSize.toFixed(1);
+                snowfall.set_min_size(currentConfig.minSize);
+            });
+
+            $("depth-slider").addEventListener("input", e => {
+                currentConfig.depth = parseFloat(e.target.value);
+                $("depth-value").textContent = currentConfig.depth;
+                snowfall.set_depth(currentConfig.depth);
+            });
+
+            $("alpha-slider").addEventListener("input", e => {
+                currentConfig.minAlpha = parseFloat(e.target.value);
+                $("alpha-value").textContent = currentConfig.minAlpha.toFixed(1);
+                snowfall.set_min_alpha(currentConfig.minAlpha);
+            });
+
+            $("speedy-slider").addEventListener("input", e => {
+                currentConfig.speedY = parseFloat(e.target.value);
+                $("speedy-value").textContent = currentConfig.speedY.toFixed(1);
+                snowfall.set_speed_y(currentConfig.speedY);
+            });
+
+            $("rotation-slider").addEventListener("input", e => {
+                currentConfig.rotationSpeed = parseFloat(e.target.value);
+                $("rotation-value").textContent = currentConfig.rotationSpeed.toFixed(1);
+                snowfall.set_rotation_speed(currentConfig.rotationSpeed);
+            });
+
+            $("diry-down").addEventListener("click", () => {
+                $("diry-down").classList.add("active");
+                $("diry-down").classList.remove("reverse");
+                $("diry-up").classList.remove("active", "reverse");
+                currentConfig.directionY = 1.0;
+                snowfall.set_direction_y(1.0);
+            });
+
+            $("diry-up").addEventListener("click", () => {
+                $("diry-up").classList.add("active", "reverse");
+                $("diry-down").classList.remove("active", "reverse");
+                currentConfig.directionY = -1.0;
+                snowfall.set_direction_y(-1.0);
+            });
+
+            let resizeTimeout = null;
+            const canvas = $("snowfall-canvas");
+            window.addEventListener("resize", () => {
+                if (!snowfall) return;
+                canvas.classList.add("resizing");
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    snowfall.resize();
+                    requestAnimationFrame(() => {
+                        snowfall.render(performance.now());
+                        requestAnimationFrame(() => {
+                            canvas.classList.remove("resizing");
+                            canvas.classList.add("fade-in");
+                            setTimeout(() => canvas.classList.remove("fade-in"), 300);
+                        });
+                    });
+                }, 150);
+            });
+
+            setupConfigButtons($);
+        }
+
+        function setupConfigButtons($) {
+            const parseRustConstants = text => {
+                const config = {};
+                const patterns = [
+                    { key: "particleCount", regex: /DEFAULT_PARTICLE_COUNT:\s*u32\s*=\s*([\d_]+)/ },
+                    { key: "gravity", regex: /DEFAULT_GRAVITY:\s*f32\s*=\s*([\d.]+)/ },
+                    { key: "depth", regex: /DEFAULT_DEPTH:\s*f32\s*=\s*([\d.]+)/ },
+                    { key: "minSize", regex: /DEFAULT_MIN_SIZE:\s*f32\s*=\s*([\d.]+)/ },
+                    { key: "minAlpha", regex: /DEFAULT_MIN_ALPHA:\s*f32\s*=\s*([\d.]+)/ },
+                    { key: "speedX", regex: /DEFAULT_SPEED_X:\s*f32\s*=\s*([\d.]+)/ },
+                    { key: "speedY", regex: /DEFAULT_SPEED_Y:\s*f32\s*=\s*([\d.]+)/ },
+                    { key: "directionX", regex: /DEFAULT_DIRECTION_X:\s*f32\s*=\s*(-?[\d.]+)/ },
+                    { key: "directionY", regex: /DEFAULT_DIRECTION_Y:\s*f32\s*=\s*(-?[\d.]+)/ },
+                    { key: "rotationSpeed", regex: /DEFAULT_ROTATION_SPEED:\s*f32\s*=\s*([\d.]+)/ },
+                ];
+                for (const { key, regex } of patterns) {
+                    const match = text.match(regex);
+                    if (match) config[key] = parseFloat(match[1].replace(/_/g, ""));
+                }
+                return config;
+            };
+
+            const showBtnStatus = (btn, success, message, originalHtml) => {
+                btn.classList.add(success ? "success" : "error");
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${success ? "M5 13l4 4L19 7" : "M6 18L18 6M6 6l12 12"}" />
+                </svg>${message}`;
+                setTimeout(() => {
+                    btn.classList.remove("success", "error");
+                    btn.innerHTML = originalHtml;
+                }, 2000);
+            };
+
+            const pasteBtn = $("paste-btn");
+            const pasteBtnHtml = pasteBtn.innerHTML;
+            pasteBtn.addEventListener("click", async () => {
+                try {
+                    const text = await navigator.clipboard.readText();
+                    const parsed = parseRustConstants(text);
+                    if (Object.keys(parsed).length === 0) {
+                        showBtnStatus(pasteBtn, false, "Неверный формат", pasteBtnHtml);
+                        return;
+                    }
+
+                    if (parsed.particleCount) {
+                        currentConfig.particleCount = parsed.particleCount;
+                        $("particle-slider").value = parsed.particleCount;
+                        $("particle-value").textContent = (parsed.particleCount / 1000).toFixed(0) + "K";
+                        snowfall.set_particle_count(parsed.particleCount);
+                    }
+                    if (parsed.gravity) {
+                        currentConfig.gravity = parsed.gravity;
+                        $("gravity-slider").value = parsed.gravity;
+                        $("gravity-value").textContent = parsed.gravity;
+                        snowfall.set_gravity(parsed.gravity);
+                    }
+                    if (parsed.minSize) {
+                        currentConfig.minSize = parsed.minSize;
+                        $("size-slider").value = parsed.minSize;
+                        $("size-value").textContent = parsed.minSize;
+                        snowfall.set_min_size(parsed.minSize);
+                    }
+                    if (parsed.depth) {
+                        currentConfig.depth = parsed.depth;
+                        $("depth-slider").value = parsed.depth;
+                        $("depth-value").textContent = parsed.depth;
+                        snowfall.set_depth(parsed.depth);
+                    }
+                    if (parsed.minAlpha) {
+                        currentConfig.minAlpha = parsed.minAlpha;
+                        $("alpha-slider").value = parsed.minAlpha;
+                        $("alpha-value").textContent = parsed.minAlpha;
+                        snowfall.set_min_alpha(parsed.minAlpha);
+                    }
+                    if (parsed.speedY) {
+                        currentConfig.speedY = parsed.speedY;
+                        $("speedy-slider").value = parsed.speedY;
+                        $("speedy-value").textContent = parsed.speedY;
+                        snowfall.set_speed_y(parsed.speedY);
+                    }
+                    if (parsed.rotationSpeed) {
+                        currentConfig.rotationSpeed = parsed.rotationSpeed;
+                        $("rotation-slider").value = parsed.rotationSpeed;
+                        $("rotation-value").textContent = parsed.rotationSpeed;
+                        snowfall.set_rotation_speed(parsed.rotationSpeed);
+                    }
+                    if (parsed.directionY) {
+                        currentConfig.directionY = parsed.directionY;
+                        snowfall.set_direction_y(parsed.directionY);
+                        if (parsed.directionY > 0) {
+                            $("diry-down").classList.add("active");
+                            $("diry-up").classList.remove("active", "reverse");
+                        } else {
+                            $("diry-up").classList.add("active", "reverse");
+                            $("diry-down").classList.remove("active");
+                        }
+                    }
+
+                    showBtnStatus(pasteBtn, true, "Применено!", pasteBtnHtml);
+                } catch (err) {
+                    console.error("Paste error:", err);
+                    showBtnStatus(pasteBtn, false, "Ошибка", pasteBtnHtml);
+                }
+            });
+
+            const copyBtn = $("copy-btn");
+            const copyBtnHtml = copyBtn.innerHTML;
+            copyBtn.addEventListener("click", async () => {
+                const formatNumber = num => Number.isInteger(num) && num >= 1000
+                    ? num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "_")
+                    : num.toString();
+
+                const rustConstants = `pub const DEFAULT_PARTICLE_COUNT: u32 = ${formatNumber(currentConfig.particleCount)};
+pub const DEFAULT_GRAVITY: f32 = ${currentConfig.gravity.toFixed(1)};
+pub const DEFAULT_DEPTH: f32 = ${currentConfig.depth.toFixed(1)};
+pub const DEFAULT_MIN_SIZE: f32 = ${currentConfig.minSize.toFixed(1)};
+pub const DEFAULT_MIN_ALPHA: f32 = ${currentConfig.minAlpha.toFixed(1)};
+pub const DEFAULT_SPEED_X: f32 = ${currentConfig.speedX.toFixed(1)};
+pub const DEFAULT_SPEED_Y: f32 = ${currentConfig.speedY.toFixed(1)};
+pub const DEFAULT_DIRECTION_X: f32 = ${currentConfig.directionX.toFixed(1)};
+pub const DEFAULT_DIRECTION_Y: f32 = ${currentConfig.directionY.toFixed(1)};
+pub const DEFAULT_ROTATION_SPEED: f32 = ${currentConfig.rotationSpeed.toFixed(1)};`;
+
+                await navigator.clipboard.writeText(rustConstants);
+                showBtnStatus(copyBtn, true, "Скопировано!", copyBtnHtml);
+            });
+        }
+
+        window.addEventListener("DOMContentLoaded", initWasm);
+    </script>
+</body>
+
+</html>

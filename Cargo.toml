@@ -1,0 +1,47 @@
+[package]
+name = "remnasnow"
+version = "0.1.0"
+edition = "2021"
+description = "WebGL snowfall effect in Rust/WASM"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+default = []
+configurable = []
+
+[dependencies]
+wasm-bindgen = "0.2.106"
+js-sys = "0.3.83"
+getrandom = { version = "0.2", features = ["js"] }
+
+[dependencies.web-sys]
+version = "0.3.83"
+features = [
+    "console",
+    "Window",
+    "Document",
+    "Element",
+    "HtmlCanvasElement",
+    "WebGlRenderingContext",
+    "WebGlProgram",
+    "WebGlShader",
+    "WebGlBuffer",
+    "WebGlUniformLocation",
+    "Performance",
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 1
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false

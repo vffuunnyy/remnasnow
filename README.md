@@ -37,10 +37,30 @@ make serve
 ```javascript
 import init, { SnowfallShader } from './pkg/remnasnow.js';
 
-await init();
+await init({ module_or_path: './pkg/remnasnow_bg.wasm' });
 
-// Create (canvas-id, particle_count - optional)
-const snowfall = new SnowfallShader('canvas-id', 130000);
+// Prepare texture (optional)
+const img = new Image();
+img.src = "snowflake.svg";
+await img.decode();
+
+// Configuration object
+const config = {
+    particleCount: 150000,
+    gravity: 8.0,
+    depth: 80.0,
+    minSize: 2.5,
+    minAlpha: 0.5,
+    speedX: 0.2,
+    speedY: 0.3,
+    directionX: 1.0,
+    directionY: 1.0,
+    rotationSpeed: 1.0,
+    color: [0.9, 0.4, 0.7], // optional RGB [0..1]
+    texture: img,           // optional HTMLImageElement
+};
+
+const snowfall = new SnowfallShader('canvas-id', config);
 
 function loop(time) {
     const result = snowfall.render(time);
@@ -53,13 +73,33 @@ requestAnimationFrame(loop);
 window.addEventListener('resize', () => snowfall.resize());
 ```
 
-### Getters
+### Methods
 
+**Getters**
 ```javascript
 snowfall.get_fps();            // Current FPS
 snowfall.get_time();           // Time since start
 snowfall.get_wind();           // Current wind
 snowfall.get_particle_count(); // Particle count
-snowfall.get_config();         // Current config
-snowfall.is_configurable();    // Can parameters be changed
+snowfall.get_config();         // Current config object
+snowfall.is_configurable();    // Check if setters are available
+```
+
+**Setters** (Only available in `configurable` feature)
+```javascript
+snowfall.set_particle_count(n); // Reinitializes buffers with new count
+snowfall.set_depth(n);          // Reinitializes buffers
+snowfall.set_min_size(n);       // Reinitializes buffers
+snowfall.set_min_alpha(n);      // Reinitializes buffers
+snowfall.set_speed_x(n);        // Reinitializes buffers
+snowfall.set_speed_y(n);        // Reinitializes buffers
+snowfall.set_direction_x(n);    // Reinitializes buffers
+snowfall.set_direction_y(n);
+snowfall.set_rotation_speed(n);
+snowfall.set_gravity(n);
+
+snowfall.set_color(r, g, b);    // 0.0 - 1.0
+snowfall.clear_color();         // Revert to original texture colors
+snowfall.set_texture(img);      // HTMLImageElement
+snowfall.clear_texture();       // Revert to default
 ```

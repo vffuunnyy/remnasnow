@@ -53,16 +53,34 @@ pub const VERTEX_SHADER_SOURCE: &str = r#"
 pub const FRAGMENT_SHADER_SOURCE: &str = r#"
     precision mediump float;
 
+    uniform sampler2D u_texture;
+    uniform bool u_useTexture;
+    uniform vec3 u_colorTint;  // default (1,1,1)
+    uniform bool u_useColorTint;
     varying lowp vec4 v_color;
     varying mediump vec2 v_rotSinCos;
 
     void main() {
         vec2 coord = gl_PointCoord - 0.5;
 
-        coord = vec2(coord.x * v_rotSinCos.y - coord.y * v_rotSinCos.x,
-                    coord.x * v_rotSinCos.x + coord.y * v_rotSinCos.y);
+        vec2 rotated = vec2(
+            coord.x * v_rotSinCos.y - coord.y * v_rotSinCos.x,
+            coord.x * v_rotSinCos.x + coord.y * v_rotSinCos.y
+        );
 
-        float dist_sq = dot(coord, coord);
+        if (u_useTexture) {
+            vec4 texColor = texture2D(u_texture, rotated + 0.5);
+            if (u_useColorTint) {
+                float intensity = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
+                gl_FragColor = vec4(u_colorTint * intensity * v_color.rgb, texColor.a * v_color.a);
+            } else {
+                gl_FragColor = vec4(texColor.rgb * v_color.rgb, texColor.a * v_color.a);
+            }
+            return;
+        }
+
+        // default (circle)
+        float dist_sq = dot(rotated, rotated);
         
         // thresholds: radius 0.25 and 0.5 squared = 0.0625, 0.25
         float alpha = 1.0 - smoothstep(0.0625, 0.25, dist_sq);
@@ -71,6 +89,6 @@ pub const FRAGMENT_SHADER_SOURCE: &str = r#"
         // exp(-sqrt(x) * 5) ≈ exp(-x * 2.5) for small x
         float glow = exp(-dist_sq * 10.0) * 0.4;
 
-        gl_FragColor = vec4(vec3(1.0 + glow), alpha * v_color.a);
+        gl_FragColor = vec4(u_colorTint * (1.0 + glow), alpha * v_color.a);
     }
 "#;

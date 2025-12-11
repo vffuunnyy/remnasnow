@@ -1,6 +1,6 @@
 [package]
 name = "remnasnow"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "WebGL snowfall effect in Rust/WASM"
 license = "MIT"
@@ -30,6 +30,8 @@ features = [
     "WebGlShader",
     "WebGlBuffer",
     "WebGlUniformLocation",
+    "WebGlTexture",
+    "HtmlImageElement",
     "Performance",
 ]
 

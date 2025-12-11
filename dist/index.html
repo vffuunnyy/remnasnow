@@ -363,6 +363,63 @@
                 transform: translateX(-50%);
             }
         }
+
+        /* Texture selector styles */
+        .texture-panel {
+            grid-column: 1 / -1;
+        }
+
+        .texture-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .texture-btn {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #484f58;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+        }
+
+        .texture-btn:hover {
+            border-color: #4ade80;
+            transform: scale(1.1);
+        }
+
+        .texture-btn.active {
+            border-color: #4ade80;
+            background: rgba(74, 222, 128, 0.2);
+        }
+
+        .texture-btn svg,
+        .texture-btn img {
+            width: 100%;
+            height: 100%;
+            filter: brightness(0) invert(1);
+        }
+
+        .texture-btn.upload-btn {
+            border-style: dashed;
+        }
+
+        .texture-btn.upload-btn svg {
+            opacity: 0.7;
+            filter: none;
+        }
+
+        #texture-upload {
+            display: none;
+        }
     </style>
 </head>
 
@@ -443,6 +500,60 @@
                     <input type="range" id="rotation-slider" min="0" max="5" step="0.1" value="1.0" />
                 </div>
             </div>
+            <div class="panel texture-panel">
+                <div class="panel-title">Текстура</div>
+                <div class="texture-grid">
+                    <button class="texture-btn active" id="tex-default" title="По умолчанию (круг)">
+                        <svg viewBox="0 0 64 64" fill="white">
+                            <circle cx="32" cy="32" r="24" />
+                        </svg>
+                    </button>
+                    <button class="texture-btn" id="tex-snowflake" title="Снежинка">
+                        <svg viewBox="0 0 64 64" fill="white">
+                            <rect x="30" y="4" width="4" height="56" rx="2" />
+                            <rect x="4" y="30" width="56" height="4" rx="2" />
+                            <rect x="30" y="4" width="4" height="56" rx="2" transform="rotate(45 32 32)" />
+                            <rect x="30" y="4" width="4" height="56" rx="2" transform="rotate(-45 32 32)" />
+                            <circle cx="32" cy="32" r="6" />
+                        </svg>
+                    </button>
+                    <button class="texture-btn" id="tex-star" title="Звезда">
+                        <svg viewBox="0 0 64 64" fill="white">
+                            <polygon points="32,4 38,24 58,24 42,38 48,58 32,46 16,58 22,38 6,24 26,24" />
+                        </svg>
+                    </button>
+                    <button class="texture-btn" id="tex-sparkle" title="Искра">
+                        <svg viewBox="0 0 64 64" fill="white">
+                            <path
+                                d="M32 4 C36 20, 44 28, 60 32 C44 36, 36 44, 32 60 C28 44, 20 36, 4 32 C20 28, 28 20, 32 4" />
+                        </svg>
+                    </button>
+                    <button class="texture-btn upload-btn" id="tex-upload" title="Загрузить свою текстуру">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="white"
+                            stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                    </button>
+                </div>
+                <input type="file" id="texture-upload" accept="image/*">
+            </div>
+            <div class="panel texture-panel">
+                <div class="panel-title">Цвет</div>
+                <div class="texture-grid">
+                    <button class="texture-btn" id="color-clean" title="Оригинальный">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <path d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                    <button class="texture-btn active" id="color-white" title="Белый"
+                        style="background: white;"></button>
+                    <button class="texture-btn" id="color-blue" title="Голубой" style="background: #60a5fa;"></button>
+                    <button class="texture-btn" id="color-gold" title="Золотой" style="background: #fbbf24;"></button>
+                    <button class="texture-btn" id="color-pink" title="Розовый" style="background: #f472b6;"></button>
+                    <input type="color" id="color-picker" value="#ffffff" title="Выбрать цвет"
+                        style="width: 50px; height: 50px; border: 2px solid #484f58; border-radius: 10px; cursor: pointer; padding: 0;">
+                </div>
+            </div>
         </div>
         <div class="config-buttons">
             <button id="paste-btn" class="config-btn">
@@ -485,10 +596,10 @@
         async function initWasm() {
             try {
                 const wasm = await import("./pkg/remnasnow.js");
-                await wasm.default("./pkg/remnasnow_bg.wasm");
+                await wasm.default({ module_or_path: "./pkg/remnasnow_bg.wasm" });
                 console.log("[RemnaSnow] WASM loaded");
 
-                snowfall = new wasm.SnowfallShader("snowfall-canvas", currentConfig.particleCount);
+                snowfall = new wasm.SnowfallShader("snowfall-canvas", currentConfig);
                 document.getElementById("loading-overlay").classList.add("hidden");
 
                 initUI();
@@ -620,10 +731,153 @@
             });
 
             setupConfigButtons($);
+            setupTextureButtons($);
+            setupColorButtons($);
+        }
+
+        // Helper to load texture from URL or SVG blob
+        async function loadTexture(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+
+        // Create blob URL from inline SVG
+        function svgToBlobUrl(svgElement) {
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const blob = new Blob([svgData], { type: 'image/svg+xml' });
+            return URL.createObjectURL(blob);
+        }
+
+        function setupTextureButtons($) {
+            const presetBtns = ['tex-default', 'tex-snowflake', 'tex-star', 'tex-sparkle'];
+            const uploadBtn = $('tex-upload');
+            const uploadInput = $('texture-upload');
+            const allTexBtns = [...presetBtns.map(id => $(id)), uploadBtn];
+
+            const clearActive = () => allTexBtns.forEach(b => b.classList.remove('active'));
+
+            // Preset texture click handler
+            presetBtns.forEach(id => {
+                const btn = $(id);
+                btn.addEventListener('click', async () => {
+                    clearActive();
+                    btn.classList.add('active');
+
+                    if (btn.id === 'tex-default') {
+                        snowfall.clear_texture();
+                        currentConfig.texture = 'default';
+                        return;
+                    }
+
+                    const svg = btn.querySelector('svg');
+                    if (svg) {
+                        try {
+                            const blobUrl = svgToBlobUrl(svg);
+                            const img = await loadTexture(blobUrl);
+                            snowfall.set_texture(img);
+                            currentConfig.texture = id.replace('tex-', '');
+                            URL.revokeObjectURL(blobUrl);
+                        } catch (err) {
+                            console.error('[RemnaSnow] Failed to load texture:', err);
+                        }
+                    }
+                });
+            });
+
+            // Upload button click
+            uploadBtn.addEventListener('click', () => {
+                uploadInput.click();
+            });
+
+            // File upload handler
+            uploadInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                try {
+                    const url = URL.createObjectURL(file);
+                    const img = await loadTexture(url);
+                    snowfall.set_texture(img);
+                    currentConfig.texture = 'custom';
+                    URL.revokeObjectURL(url);
+
+                    clearActive();
+                    uploadBtn.classList.add('active');
+
+                    // Update button preview
+                    uploadBtn.innerHTML = '';
+                    const preview = document.createElement('img');
+                    preview.src = URL.createObjectURL(file);
+                    preview.alt = 'Custom texture';
+                    uploadBtn.appendChild(preview);
+                } catch (err) {
+                    console.error('[RemnaSnow] Failed to load custom texture:', err);
+                }
+            });
+        }
+
+        function setupColorButtons($) {
+            const colorPresets = {
+                'color-white': [1.0, 1.0, 1.0],
+                'color-blue': [0.376, 0.647, 0.98],  // #60a5fa
+                'color-gold': [0.984, 0.749, 0.141], // #fbbf24
+                'color-pink': [0.957, 0.447, 0.714]  // #f472b6
+            };
+
+            // Preset color buttons
+            Object.entries(colorPresets).forEach(([id, [r, g, b]]) => {
+                $(id).addEventListener('click', () => {
+                    document.querySelectorAll('#color-clean, #color-white, #color-blue, #color-gold, #color-pink')
+                        .forEach(btn => btn.classList.remove('active'));
+                    $(id).classList.add('active');
+                    snowfall.set_color(r, g, b);
+                    currentConfig.color = [r, g, b];
+                });
+            });
+
+            // Clear color button
+            $('color-clean').addEventListener('click', () => {
+                console.log('[RemnaSnow] Clear color clicked');
+                document.querySelectorAll('#color-clean, #color-white, #color-blue, #color-gold, #color-pink')
+                    .forEach(btn => btn.classList.remove('active'));
+                $('color-clean').classList.add('active');
+                if (snowfall.clear_color) {
+                    snowfall.clear_color();
+                    delete currentConfig.color;
+                } else {
+                    console.error('[RemnaSnow] snowfall.clear_color is undefined!');
+                }
+            });
+
+            // Custom color picker
+            const colorPicker = $('color-picker');
+            colorPicker.addEventListener('input', (e) => {
+                const hex = e.target.value;
+                const r = parseInt(hex.slice(1, 3), 16) / 255;
+                const g = parseInt(hex.slice(3, 5), 16) / 255;
+                const b = parseInt(hex.slice(5, 7), 16) / 255;
+                snowfall.set_color(r, g, b);
+                currentConfig.color = [r, g, b];
+
+                // Clear preset selection
+                document.querySelectorAll('#color-clean, #color-white, #color-blue, #color-gold, #color-pink')
+                    .forEach(btn => btn.classList.remove('active'));
+            });
         }
 
         function setupConfigButtons($) {
-            const parseRustConstants = text => {
+            const parseConfig = text => {
+                try {
+                    const fn = new Function(`return ${text.trim()};`);
+                    const obj = fn();
+                    if (obj && typeof obj === 'object') return obj;
+                } catch (e) {
+                }
+
                 const config = {};
                 const patterns = [
                     { key: "particleCount", regex: /DEFAULT_PARTICLE_COUNT:\s*u32\s*=\s*([\d_]+)/ },
@@ -636,10 +890,17 @@
                     { key: "directionX", regex: /DEFAULT_DIRECTION_X:\s*f32\s*=\s*(-?[\d.]+)/ },
                     { key: "directionY", regex: /DEFAULT_DIRECTION_Y:\s*f32\s*=\s*(-?[\d.]+)/ },
                     { key: "rotationSpeed", regex: /DEFAULT_ROTATION_SPEED:\s*f32\s*=\s*([\d.]+)/ },
+                    { key: "texture", regex: /texture:\s*"([^"]+)"/ }, // Added regex for texture
                 ];
                 for (const { key, regex } of patterns) {
                     const match = text.match(regex);
-                    if (match) config[key] = parseFloat(match[1].replace(/_/g, ""));
+                    if (match) {
+                        if (key === "texture") {
+                            config[key] = match[1];
+                        } else {
+                            config[key] = parseFloat(match[1].replace(/_/g, ""));
+                        }
+                    }
                 }
                 return config;
             };
@@ -660,7 +921,7 @@
             pasteBtn.addEventListener("click", async () => {
                 try {
                     const text = await navigator.clipboard.readText();
-                    const parsed = parseRustConstants(text);
+                    const parsed = parseConfig(text);
                     if (Object.keys(parsed).length === 0) {
                         showBtnStatus(pasteBtn, false, "Неверный формат", pasteBtnHtml);
                         return;
@@ -719,7 +980,13 @@
                             $("diry-down").classList.remove("active");
                         }
                     }
-
+                    if (parsed.texture && typeof parsed.texture === 'string' && parsed.texture !== 'custom') {
+                        const btnId = `tex-${parsed.texture}`;
+                        const btn = document.getElementById(btnId);
+                        if (btn) {
+                            btn.click();
+                        }
+                    }
                     showBtnStatus(pasteBtn, true, "Применено!", pasteBtnHtml);
                 } catch (err) {
                     console.error("Paste error:", err);
@@ -730,22 +997,28 @@
             const copyBtn = $("copy-btn");
             const copyBtnHtml = copyBtn.innerHTML;
             copyBtn.addEventListener("click", async () => {
-                const formatNumber = num => Number.isInteger(num) && num >= 1000
-                    ? num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "_")
-                    : num.toString();
+                const configLines = Object.entries(currentConfig).map(([key, val]) => {
+                    if (key === 'texture' && (typeof val !== 'string' || val === 'custom')) return null;
 
-                const rustConstants = `pub const DEFAULT_PARTICLE_COUNT: u32 = ${formatNumber(currentConfig.particleCount)};
-pub const DEFAULT_GRAVITY: f32 = ${currentConfig.gravity.toFixed(1)};
-pub const DEFAULT_DEPTH: f32 = ${currentConfig.depth.toFixed(1)};
-pub const DEFAULT_MIN_SIZE: f32 = ${currentConfig.minSize.toFixed(1)};
-pub const DEFAULT_MIN_ALPHA: f32 = ${currentConfig.minAlpha.toFixed(1)};
-pub const DEFAULT_SPEED_X: f32 = ${currentConfig.speedX.toFixed(1)};
-pub const DEFAULT_SPEED_Y: f32 = ${currentConfig.speedY.toFixed(1)};
-pub const DEFAULT_DIRECTION_X: f32 = ${currentConfig.directionX.toFixed(1)};
-pub const DEFAULT_DIRECTION_Y: f32 = ${currentConfig.directionY.toFixed(1)};
-pub const DEFAULT_ROTATION_SPEED: f32 = ${currentConfig.rotationSpeed.toFixed(1)};`;
+                    let formattedVal;
+                    if (key === 'texture') {
+                        formattedVal = `"${val}"`;
+                    } else if (Array.isArray(val)) {
+                        formattedVal = `[${val.map(n => n.toFixed(3)).join(', ')}]`;
+                    } else if (Number.isInteger(val) && val >= 1000) {
+                        formattedVal = val.toString().replace(/\B(?=(\d{3})+(?!\d))/g, "_");
+                    } else if (typeof val === 'number') {
+                        formattedVal = val;
+                    } else {
+                        formattedVal = JSON.stringify(val);
+                    }
 
-                await navigator.clipboard.writeText(rustConstants);
+                    return `    ${key}: ${formattedVal},`;
+                }).filter(scan => scan !== null);
+
+                const configString = `{\n${configLines.join('\n')}\n}`;
+
+                await navigator.clipboard.writeText(configString);
                 showBtnStatus(copyBtn, true, "Скопировано!", copyBtnHtml);
             });
         }

@@ -14,7 +14,11 @@ pub use renderer::{RenderResult, SnowfallShader};
 
 #[wasm_bindgen(start)]
 pub fn main() {
-    let mode = if RUNTIME_CONFIGURABLE { "configurable" } else { "release" };
+    let mode = if RUNTIME_CONFIGURABLE {
+        "configurable"
+    } else {
+        "release"
+    };
     console::log_1(&format!("[RemnaSnow] WASM loaded ({mode})").into());
 }
 

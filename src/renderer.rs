@@ -2,15 +2,19 @@
 
 use js_sys::Math;
 use wasm_bindgen::prelude::*;
+#[cfg(feature = "configurable")]
+use web_sys::{HtmlImageElement, WebGlTexture};
 use web_sys::{
-    console, HtmlCanvasElement, WebGlBuffer, WebGlProgram, WebGlRenderingContext as GL,
-    WebGlShader, WebGlUniformLocation,
+    console, HtmlCanvasElement, WebGlBuffer, WebGlProgram,
+    WebGlRenderingContext as GL, WebGlShader, WebGlUniformLocation,
 };
 
 use crate::config::{SnowConfig, WindState};
 use crate::constants::*;
 use crate::shaders::{FRAGMENT_SHADER_SOURCE, VERTEX_SHADER_SOURCE};
 
+// Uniform locations are read by WebGL. Suppress dead_code warning.
+#[allow(dead_code)]
 struct Uniforms {
     time: Option<WebGlUniformLocation>,
     projection: Option<WebGlUniformLocation>,
@@ -20,6 +24,10 @@ struct Uniforms {
     resolution: Option<WebGlUniformLocation>,
     rotation_speed: Option<WebGlUniformLocation>,
     point_scale: Option<WebGlUniformLocation>,
+    texture: Option<WebGlUniformLocation>,
+    use_texture: Option<WebGlUniformLocation>,
+    color_tint: Option<WebGlUniformLocation>,
+    use_color_tint: Option<WebGlUniformLocation>,
 }
 
 impl Uniforms {
@@ -34,6 +42,10 @@ impl Uniforms {
             resolution: get("u_resolution"),
             rotation_speed: get("u_rotationSpeed"),
             point_scale: get("u_pointScale"),
+            texture: get("u_texture"),
+            use_texture: get("u_useTexture"),
+            color_tint: get("u_colorTint"),
+            use_color_tint: get("u_useColorTint"),
         }
     }
 }
@@ -64,6 +76,8 @@ pub struct SnowfallShader {
     program: WebGlProgram,
     uniforms: Uniforms,
     buffers: Option<Buffers>,
+    #[cfg(feature = "configurable")]
+    texture: Option<WebGlTexture>,
 
     base_particle_count: u32,
     actual_particle_count: i32,
@@ -86,10 +100,11 @@ pub struct SnowfallShader {
 #[wasm_bindgen]
 impl SnowfallShader {
     #[wasm_bindgen(constructor)]
-    pub fn new(canvas_id: &str, initial_particle_count: Option<u32>) -> Result<Self, JsValue> {
+    pub fn new(canvas_id: &str, config_val: JsValue) -> Result<Self, JsValue> {
         console::log_1(&"[RemnaSnow] Initializing WASM module...".into());
 
-        let particle_count = initial_particle_count.unwrap_or(DEFAULT_PARTICLE_COUNT);
+        let config = SnowConfig::from_js(config_val);
+
         let document = web_sys::window()
             .and_then(|w| w.document())
             .ok_or("Failed to get document")?;
@@ -112,7 +127,6 @@ impl SnowfallShader {
         gl.use_program(Some(&program));
 
         let uniforms = Uniforms::load(&gl, &program);
-        let config = SnowConfig::default();
 
         let mut shader = Self {
             gl,
@@ -120,12 +134,14 @@ impl SnowfallShader {
             program,
             uniforms,
             buffers: None,
-            base_particle_count: particle_count,
+            #[cfg(feature = "configurable")]
+            texture: None,
+            base_particle_count: config.particle_count,
             actual_particle_count: 0,
             time: 0.0,
             last_time: 0.0,
             wind: WindState::default(),
-            config,
+            config: config.clone(),
             frame_count: 0,
             fps_last_time: 0.0,
             current_fps: 0,
@@ -136,6 +152,26 @@ impl SnowfallShader {
 
         shader.resize()?;
         shader.setup_buffers()?;
+
+        #[cfg(feature = "configurable")]
+        {
+            if let Some(c) = &config.color {
+                if c.len() >= 3 {
+                    shader.set_color(c[0], c[1], c[2]);
+                }
+            } else {
+                shader.set_color(1.0, 1.0, 1.0);
+            }
+            
+            if let Some(tex) = &config.texture {
+                shader.set_texture(tex)?;
+            }
+        }
+        
+        #[cfg(not(feature = "configurable"))]
+        {
+            shader.set_uniform_3f(&shader.uniforms.color_tint, 1.0, 1.0, 1.0);
+        }
 
         console::log_1(
             &format!(
@@ -437,6 +473,84 @@ impl SnowfallShader {
         self.set_uniform_1f(&self.uniforms.rotation_speed, value);
     }
 
+    #[cfg(feature = "configurable")]
+    pub fn set_color(&mut self, r: f32, g: f32, b: f32) {
+        self.set_uniform_3f(&self.uniforms.color_tint, r, g, b);
+        if let Some(loc) = &self.uniforms.use_color_tint {
+            self.gl.uniform1i(Some(loc), 1);
+        }
+    }
+
+    #[cfg(feature = "configurable")]
+    pub fn clear_color(&mut self) {
+        if let Some(loc) = &self.uniforms.use_color_tint {
+            self.gl.uniform1i(Some(loc), 0);
+        }
+    }
+
+    #[cfg(feature = "configurable")]
+    pub fn set_texture(&mut self, image: &HtmlImageElement) -> Result<(), JsValue> {
+        if self.texture.is_none() {
+            self.texture = self.gl.create_texture();
+        }
+
+        let texture = self.texture.as_ref().ok_or("Failed to create texture")?;
+
+        self.gl.bind_texture(GL::TEXTURE_2D, Some(texture));
+        self.gl.tex_image_2d_with_u32_and_u32_and_image(
+            GL::TEXTURE_2D,
+            0,
+            GL::RGBA as i32,
+            GL::RGBA,
+            GL::UNSIGNED_BYTE,
+            image,
+        )?;
+
+        self.gl
+            .tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_WRAP_S, GL::CLAMP_TO_EDGE as i32);
+        self.gl
+            .tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_WRAP_T, GL::CLAMP_TO_EDGE as i32);
+        self.gl
+            .tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_MIN_FILTER, GL::LINEAR as i32);
+        self.gl
+            .tex_parameteri(GL::TEXTURE_2D, GL::TEXTURE_MAG_FILTER, GL::LINEAR as i32);
+
+        self.gl.active_texture(GL::TEXTURE0);
+        self.gl.bind_texture(GL::TEXTURE_2D, Some(texture));
+
+        if let Some(loc) = &self.uniforms.texture {
+            self.gl.uniform1i(Some(loc), 0);
+        }
+
+        if let Some(loc) = &self.uniforms.use_texture {
+            self.gl.uniform1i(Some(loc), 1);
+        }
+
+        console::log_1(
+            &format!(
+                "[RemnaSnow] Texture loaded: {}x{}",
+                image.natural_width(),
+                image.natural_height()
+            )
+            .into(),
+        );
+
+        Ok(())
+    }
+
+    #[cfg(feature = "configurable")]
+    pub fn clear_texture(&mut self) {
+        if let Some(texture) = self.texture.take() {
+            self.gl.delete_texture(Some(&texture));
+        }
+
+        if let Some(loc) = &self.uniforms.use_texture {
+            self.gl.uniform1i(Some(loc), 0);
+        }
+
+        console::log_1(&"[RemnaSnow] Texture cleared".into());
+    }
+
     pub fn get_fps(&self) -> u32 {
         self.current_fps
     }
@@ -450,7 +564,7 @@ impl SnowfallShader {
         self.actual_particle_count as u32
     }
     pub fn get_config(&self) -> SnowConfig {
-        self.config
+        self.config.clone()
     }
     pub fn is_configurable(&self) -> bool {
         RUNTIME_CONFIGURABLE
